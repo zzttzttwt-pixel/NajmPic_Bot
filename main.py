@@ -17,7 +17,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # ⚠️ ضع هنا معرف قناتك الجديد (مثال: @my_channel)
-CHANNEL_USERNAME = "@ضع_معرف_قناتك_هنا" 
+CHANNEL_USERNAME = "@https://t.me/+y30XSIXPqlQyZDBk" 
 
 # تشغيل مكتبة Gemini المحدثة
 client = genai.Client(api_key=GEMINI_API_KEY)
