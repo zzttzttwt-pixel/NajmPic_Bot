@@ -120,7 +120,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("خطأ: TELEGRAM_BOT_TOKEN غير موجود!")
 
-application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+from telegram.request import HTTPXRequest
+
+# بناء التطبيق مع زيادة مهلة الانتظار لـ 60 ثانية لتجنب الـ Timeout
+torrent_request = HTTPXRequest(connect_timeout=60.0, read_timeout=60.0)
+application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).request(torrent_request).build()
 
 # إضافة الأوامر والمستقبلات
 application.add_handler(CommandHandler("start", start))
