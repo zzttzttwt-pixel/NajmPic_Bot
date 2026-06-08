@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from google import genai
 from telegram.error import BadRequest
 from telegram.request import HTTPXRequest
@@ -17,8 +17,8 @@ logging.basicConfig(
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ⚠️ ضع هنا معرف قناتك (مثال: @my_channel)
-CHANNEL_USERNAME = "@ضع_معرف_قناتك_هنا" 
+# ⚠️ ضع هنا معرف قناتك الحقيقي (مثال: @my_channel)
+CHANNEL_USERNAME = "@NajmPlus" 
 
 # تشغيل مكتبة Gemini المحدثة
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -41,7 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🤖 أهلاً بك في بوت الذكاء الاصطناعي الشامل المطور!\n\n"
             "💬 **للمحادثة العادية:** أرسل لي أي سؤال وسأجيبك فوراً.\n"
             "🎨 **لتوليد الصور:** اكتب الأمر `/draw` متبوعاً بالوصف، أو ابدأ رسالتك بكلمة **ارسم**.\n"
-            "💡 *مثال:* `ارسم سيارة رياضية فاخرة في شوارع مكة`"
+            "💡 *مثال:* `ارسم سيارة رياضية فاخرة تحت المطر`"
         )
         await update.message.reply_text(welcome_text)
     else:
@@ -52,18 +52,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(f"عذراً يا أخي، يجب عليك الاشتراك في قناتنا أولاً لتتمكن من استخدام البوت وميزاته مجاناً!\n\nاشترك ثم اضغط على زر التفعيل بالأسفل 👇", reply_markup=reply_markup)
 
-# دالة السحرية لتوليد الصور وإرسالها حقيقية
+# زر التحقق من الاشتراك التفاعلي
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    if await is_subscribed(user_id, context):
+        welcome_text = (
+            "🎉 أحسنت! تم تفعيل البوت بنجاح.\n\n"
+            "💬 **للمحادثة العادية:** أرسل لي أي سؤال وسأجيبك فوراً.\n"
+            "🎨 **لتوليد الصور:** اكتب الأمر `/draw` أو ابدأ بكلمة **ارسم**."
+        )
+        await query.edit_message_text(welcome_text)
+    else:
+        await context.bot.send_message(chat_id=user_id, text="❌ لم تشترك في القناة بعد يا أخي! يرجى الاشتراك أولاً ثم الضغط على الزر مجدداً.")
+
+# الدالة السحرية لتوليد الصور وإرسالها حقيقية
 async def generate_and_send_image(chat_id, prompt, update, context, waiting_message):
     try:
-        # تحويل النص لرابط صورة مباشر ومضمون 100% عبر Pollinations AI
-        formatted_prompt = prompt.strip().replace(" ", "%20")
+        # تنظيف النص وتحويله لرابط صورة مباشر ومضمون عبر Pollinations AI
+        clean_prompt = prompt.strip().replace("\n", " ")
+        formatted_prompt = clean_prompt.replace(" ", "%20")
         image_url = f"https://image.pollinations.ai/prompt/{formatted_prompt}?width=1024&height=1024&nologo=true"
         
         # إرسال الصورة للمستخدم مباشرة كملف صورة حقيقي
         await context.bot.send_photo(
             chat_id=chat_id, 
             photo=image_url, 
-            caption=f"✨ صورتك الجاهزة بناءً على طلبك:\n`{prompt}`", 
+            caption=f"✨ صورتك الجاهزة بناءً على طلبك:\n`{clean_prompt}`", 
             parse_mode="Markdown"
         )
         await waiting_message.delete()
@@ -97,8 +114,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ✨ الحيلة الذكية: إذا بدأ المستخدم كلامه بكلمة "ارسم" أو "صورة"
     if user_text.strip().startswith(("ارسم", "صورة", "draw", "img")):
-        # حذف كلمة "ارسم" من الوصف وإرسالها لمحرك الصور فوراً
-        clean_prompt = user_text.replace("ارسم", "").replace("صورة", "").strip()
+        clean_prompt = user_text.replace("ارسم", "").replace("صورة", "").replace("draw", "").replace("img", "").strip()
         if clean_prompt:
             waiting_message = await update.message.reply_text("فهمتك! جاري رسم وتوليد صورتك الآن... 🎨⏳")
             await generate_and_send_image(update.effective_chat.id, clean_prompt, update, context, waiting_message)
@@ -125,6 +141,7 @@ application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).request(torrent_req
 # إضافة الأوامر والمستقبلات
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler(["draw", "img"], draw_command))
+application.add_handler(CallbackQueryHandler(button_click, pattern="check_sub"))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 # تشغيل البوت
